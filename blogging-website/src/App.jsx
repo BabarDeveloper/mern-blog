@@ -7,11 +7,12 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import Error from "./pages/Error";
 import Header from "./components/Header";
+import FooterCom from "./components/Footer";
 
 export default function App() {
   return (
     <BrowserRouter>
-    <Header />
+      <Header />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/sign-up" element={<SignUp />} />
         <Route path="/*" element={<Error />} />
       </Routes>
+      <FooterCom />
     </BrowserRouter>
   );
 }
