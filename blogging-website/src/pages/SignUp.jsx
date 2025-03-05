@@ -49,8 +49,8 @@ export default function SignUp() {
             Blog
           </Link>
           <p className="text-sm mt-5">
-            Insightful articles on trends, tips, and strategies in digital
-            marketing, tech, and business growth. Stay inspired!
+            Get insights on digital marketing, tech, and business growth. Stay
+            ahead—sign up to unlock exclusive content!
           </p>
         </div>
         {/* right */}
@@ -78,7 +78,7 @@ export default function SignUp() {
               <Label value="Your password" />
               <TextInput
                 type="password"
-                placeholder="Password"
+                placeholder="*********"
                 id="password"
                 onChange={handleChange}
               />
