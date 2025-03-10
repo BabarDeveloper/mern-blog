@@ -1,5 +1,4 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client.js";
 import "./index.css";
 import App from "./App.jsx";
 import { store, persistor } from "./redux/store.js";
