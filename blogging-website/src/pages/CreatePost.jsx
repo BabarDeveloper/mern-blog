@@ -5,6 +5,7 @@ import "react-quill/dist/quill.snow.css";
 import axios from "axios";
 import { CircularProgressbar } from "react-circular-progressbar";
 import "react-circular-progressbar/dist/styles.css";
+import { useNavigate } from "react-router-dom";
 
 export default function CreatePost() {
   const [file, setFile] = useState(null);
@@ -12,12 +13,15 @@ export default function CreatePost() {
   const [imageFileUploadProgress, setImageFileUploadProgress] = useState(0);
   const [imageFileUploadError, setImageFileUploadError] = useState(null);
   const [imageFileUrl, setImageFileUrl] = useState(null);
+  const [publishError, setPublishError] = useState(null);
+  const [publishSuccess, setPublishSuccess] = useState(null); // New state for success message
   const [formData, setFormData] = useState({
     title: "",
     category: "uncategorized",
     profilePicture: "",
     content: "",
   });
+  const navigate = useNavigate();
 
   const handleUploadImage = async () => {
     try {
@@ -63,10 +67,40 @@ export default function CreatePost() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Form Data:", formData);
-    // You can now send the formData to your backend or perform any other action
+    try {
+      const res = await fetch("/api/post/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPublishError(data.message);
+        setPublishSuccess(null); // Reset success message on error
+        return;
+      }
+      if (res.ok) {
+        setPublishError(null);
+        navigate(`/post/${data.slug}`);
+        setPublishSuccess("Post published successfully!"); // Set success message
+        // Reset form data after successful submission
+        setFormData({
+          title: "",
+          category: "uncategorized",
+          profilePicture: "",
+          content: "",
+        });
+        setDescription(""); // Reset description
+        setImageFileUrl(null); // Reset image URL
+      }
+    } catch (error) {
+      setPublishError("Something went wrong");
+      setPublishSuccess(null); // Reset success message on error
+    }
   };
 
   return (
@@ -154,6 +188,16 @@ export default function CreatePost() {
         <Button type="submit" gradientDuoTone="purpleToPink">
           Publish
         </Button>
+        {publishError && (
+          <Alert className="mt-5" color="failure">
+            {publishError}
+          </Alert>
+        )}
+        {publishSuccess && (
+          <Alert className="mt-5" color="success">
+            {publishSuccess}
+          </Alert>
+        )}
       </form>
     </div>
   );
