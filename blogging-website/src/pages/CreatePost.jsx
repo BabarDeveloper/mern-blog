@@ -14,11 +14,11 @@ export default function CreatePost() {
   const [imageFileUploadError, setImageFileUploadError] = useState(null);
   const [imageFileUrl, setImageFileUrl] = useState(null);
   const [publishError, setPublishError] = useState(null);
-  const [publishSuccess, setPublishSuccess] = useState(null); // New state for success message
+  const [publishSuccess, setPublishSuccess] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
     category: "uncategorized",
-    profilePicture: "",
+    image: "", // Changed from profilePicture to image
     content: "",
   });
   const navigate = useNavigate();
@@ -30,13 +30,13 @@ export default function CreatePost() {
         return;
       }
 
-      setImageFileUploadProgress(0); // Reset progress
-      setImageFileUploadError(null); // Reset error
+      setImageFileUploadProgress(0);
+      setImageFileUploadError(null);
 
       const formDataForUpload = new FormData();
       formDataForUpload.append("file", file);
-      formDataForUpload.append("upload_preset", "mern_blog"); // Replace with your Cloudinary preset
-      formDataForUpload.append("cloud_name", "babarali"); // Replace with your Cloudinary cloud name
+      formDataForUpload.append("upload_preset", "mern_blog");
+      formDataForUpload.append("cloud_name", "babarali");
 
       const res = await axios.post(
         "https://api.cloudinary.com/v1_1/babarali/image/upload",
@@ -46,60 +46,59 @@ export default function CreatePost() {
             const progress = Math.round(
               (progressEvent.loaded / progressEvent.total) * 100
             );
-            setImageFileUploadProgress(progress); // Update progress
+            setImageFileUploadProgress(progress);
           },
         }
       );
 
-      const downloadURL = res.data.secure_url; // Get the uploaded image URL
-      setImageFileUrl(downloadURL); // Set uploaded image URL
-      setImageFileUploadProgress(100); // Mark upload as complete
-
-      // Update formData with the new profile picture URL
-      setFormData((prevFormData) => ({
-        ...prevFormData,
-        profilePicture: downloadURL,
+      const downloadURL = res.data.secure_url;
+      setImageFileUrl(downloadURL);
+      setImageFileUploadProgress(100);
+      
+      setFormData(prev => ({
+        ...prev,
+        image: downloadURL
       }));
     } catch (error) {
       console.error("Image upload failed", error);
-      setImageFileUploadError("Image upload failed. Please try again."); // Set error message
-      setImageFileUploadProgress(null); // Reset progress on error
+      setImageFileUploadError("Image upload failed. Please try again.");
+      setImageFileUploadProgress(null);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
+      if (!formData.image) {
+        setPublishError("Please upload an image first");
+        return;
+      }
+
       const res = await fetch("/api/post/create", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          content: description,
+        }),
       });
+      
       const data = await res.json();
       if (!res.ok) {
         setPublishError(data.message);
-        setPublishSuccess(null); // Reset success message on error
+        setPublishSuccess(null);
         return;
       }
-      if (res.ok) {
-        setPublishError(null);
-        navigate(`/post/${data.slug}`);
-        setPublishSuccess("Post published successfully!"); // Set success message
-        // Reset form data after successful submission
-        setFormData({
-          title: "",
-          category: "uncategorized",
-          profilePicture: "",
-          content: "",
-        });
-        setDescription(""); // Reset description
-        setImageFileUrl(null); // Reset image URL
-      }
+      
+      setPublishError(null);
+      setPublishSuccess("Post published successfully!");
+      navigate(`/post/${data.slug}`);
     } catch (error) {
       setPublishError("Something went wrong");
-      setPublishSuccess(null); // Reset success message on error
+      setPublishSuccess(null);
     }
   };
 

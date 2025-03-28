@@ -1,4 +1,4 @@
-import { Button, TextInput, Alert, Modal } from "flowbite-react"; // Import Alert
+import { Button, TextInput, Alert, Modal } from "flowbite-react";
 import { useEffect, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { CircularProgressbar } from "react-circular-progressbar";
@@ -17,24 +17,34 @@ import "react-circular-progressbar/dist/styles.css";
 import axios from "axios";
 
 export default function DashProfile() {
-  const { currentUser, error, loading } = useSelector((state) => state.user);
+  const { currentUser } = useSelector((state) => state.user);
   const [imageFile, setImageFile] = useState(null);
   const [imageFileUrl, setImageFileUrl] = useState(null);
   const [imageFileUploadProgress, setImageFileUploadProgress] = useState(null);
-  const [imageFileUploadError, setImageFileUploadError] = useState(null); // State for image upload error
+  const [imageFileUploadError, setImageFileUploadError] = useState(null);
   const [formData, setFormData] = useState({});
   const [showModal, setShowModal] = useState(false);
-  const [updateUserSuccess, setUpdateUserSuccess] = useState(null); // State for user update success
-  const [updateUserError, setUpdateUserError] = useState(null); // State for user update error
+  const [updateUserSuccess, setUpdateUserSuccess] = useState(null);
+  const [updateUserError, setUpdateUserError] = useState(null);
   const filePickerRef = useRef();
   const dispatch = useDispatch();
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Validate file type and size
+      if (!file.type.startsWith('image/')) {
+        setImageFileUploadError('Please select an image file (JPEG, PNG)');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setImageFileUploadError('File size must be less than 5MB');
+        return;
+      }
+      
       setImageFile(file);
-      setImageFileUrl(URL.createObjectURL(file)); // Preview before upload
-      setImageFileUploadError(null); // Reset any previous error
+      setImageFileUrl(URL.createObjectURL(file));
+      setImageFileUploadError(null);
     }
   };
 
@@ -45,40 +55,52 @@ export default function DashProfile() {
   }, [imageFile]);
 
   const uploadImage = async () => {
-    setImageFileUploadProgress(0); // Reset progress
-    setImageFileUploadError(null); // Reset error
-    const formData = new FormData();
-    formData.append("file", imageFile);
-    formData.append("upload_preset", "mern_blog"); // Replace with Cloudinary preset
-    formData.append("cloud_name", "babarali"); // Replace with your Cloudinary cloud name
-
     try {
+      setImageFileUploadProgress(0);
+      setImageFileUploadError(null);
+      
+      const formDataForUpload = new FormData();
+      formDataForUpload.append("file", imageFile);
+      formDataForUpload.append("upload_preset", "mern_blog");
+      formDataForUpload.append("cloud_name", "babarali");
+
       const res = await axios.post(
         "https://api.cloudinary.com/v1_1/babarali/image/upload",
-        formData,
+        formDataForUpload,
         {
           onUploadProgress: (progressEvent) => {
             const progress = Math.round(
               (progressEvent.loaded / progressEvent.total) * 100
             );
-            setImageFileUploadProgress(progress); // Update progress
+            setImageFileUploadProgress(progress);
           },
         }
       );
 
-      const downloadURL = res.data.secure_url; // Get the uploaded image URL
-      setImageFileUrl(downloadURL); // Set uploaded image URL
-      setImageFileUploadProgress(100); // Mark upload as complete
-
+      const downloadURL = res.data.secure_url;
+      setImageFileUrl(downloadURL);
+      setImageFileUploadProgress(100);
+      
       // Update formData with the new profile picture URL
-      setFormData((prevFormData) => ({
-        ...prevFormData,
-        profilePicture: downloadURL,
+      setFormData(prev => ({
+        ...prev,
+        profilePicture: downloadURL
       }));
+      
+      // Immediately update the Redux store with the new image
+      dispatch(updateSuccess({ 
+        ...currentUser, 
+        profilePicture: downloadURL 
+      }));
+
+      setUpdateUserSuccess("Profile picture uploaded successfully!");
+      
     } catch (error) {
-      console.error("Image upload failed", error);
-      setImageFileUploadError("Image upload failed. Please try again."); // Set error message
-      setImageFileUploadProgress(null); // Reset progress on error
+      console.error("Image upload failed:", error);
+      setImageFileUploadError(
+        error.response?.data?.message || "Image upload failed. Please try again."
+      );
+      setImageFileUploadProgress(null);
     }
   };
 
@@ -88,12 +110,15 @@ export default function DashProfile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (Object.keys(formData).length === 0) {
-      setUpdateUserError("No changes made");
-      return;
-    }
+    
     try {
+      // If only image was changed and no other fields
+      if (Object.keys(formData).length === 0) {
+        return;
+      }
+
       dispatch(updateStart());
+      
       const res = await fetch(`/api/user/update/${currentUser._id}`, {
         method: "PUT",
         headers: {
@@ -101,20 +126,22 @@ export default function DashProfile() {
         },
         body: JSON.stringify(formData),
       });
+      
       const data = await res.json();
+      
       if (!res.ok) {
-        dispatch(updateFailure(data.message));
-        setUpdateUserError(data.message); // Set user update error
-        setUpdateUserSuccess(null); // Reset success message
-      } else {
-        dispatch(updateSuccess(data));
-        setUpdateUserSuccess("User profile updated successfully!"); // Set success message
-        setUpdateUserError(null); // Reset error message
+        throw new Error(data.message || "Failed to update profile");
       }
+
+      dispatch(updateSuccess(data));
+      setUpdateUserSuccess("Profile updated successfully!");
+      setUpdateUserError(null);
+      setFormData({});
+      
     } catch (error) {
       dispatch(updateFailure(error.message));
-      setUpdateUserError(error.message); // Set user update error
-      setUpdateUserSuccess(null); // Reset success message
+      setUpdateUserError(error.message);
+      setUpdateUserSuccess(null);
     }
   };
 
@@ -127,10 +154,9 @@ export default function DashProfile() {
       });
       const data = await res.json();
       if (!res.ok) {
-        dispatch(deleteUserFailure(data.message));
-      } else {
-        dispatch(deleteUserSuccess(data));
+        throw new Error(data.message || "Failed to delete account");
       }
+      dispatch(deleteUserSuccess());
     } catch (error) {
       dispatch(deleteUserFailure(error.message));
     }
@@ -143,18 +169,18 @@ export default function DashProfile() {
       });
       const data = await res.json();
       if (!res.ok) {
-        console.log(data.message);
-      } else {
-        dispatch(signoutSuccess());
+        console.error(data.message);
+        return;
       }
+      dispatch(signoutSuccess());
     } catch (error) {
-      console.log(error.message);
+      console.error(error.message);
     }
   };
 
   return (
     <div className="max-w-lg mx-auto p-3 w-full">
-      <h1 className="my-7 text-center font-semibold text-3xl ">Profile</h1>
+      <h1 className="my-7 text-center font-semibold text-3xl">Profile</h1>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <input
           type="file"
@@ -181,9 +207,7 @@ export default function DashProfile() {
                   left: 0,
                 },
                 path: {
-                  stroke: `rgba(62, 152, 199, ${
-                    imageFileUploadProgress / 100
-                  })`,
+                  stroke: `rgba(62, 152, 199, ${imageFileUploadProgress / 100})`,
                 },
               }}
             />
@@ -204,17 +228,21 @@ export default function DashProfile() {
           </p>
         )}
         {imageFileUploadError && (
-          <Alert color="failure">{imageFileUploadError}</Alert> // Image upload error alert
+          <Alert color="failure" className="mt-2">
+            {imageFileUploadError}
+          </Alert>
         )}
         {updateUserSuccess && (
-          <Alert color="success">{updateUserSuccess}</Alert> // User update success alert
+          <Alert color="success" className="mt-2">
+            {updateUserSuccess}
+          </Alert>
         )}
         {updateUserError && (
-          <Alert color="failure">{updateUserError}</Alert> // User update error alert
+          <Alert color="failure" className="mt-2">
+            {updateUserError}
+          </Alert>
         )}
-        {error && (
-          <Alert color="failure">{error}</Alert> // User update error alert
-        )}
+        
         <TextInput
           type="text"
           id="username"
@@ -235,16 +263,18 @@ export default function DashProfile() {
           placeholder="password"
           onChange={handleChange}
         />
+        
         <Button
           type="submit"
           gradientDuoTone="purpleToBlue"
           outline
-          disabled={loading || imageFileUploadProgress}
+          disabled={imageFileUploadProgress !== null && imageFileUploadProgress < 100}
         >
-          {loading ? "Loading..." : "Update"}
+          Update Profile
         </Button>
+        
         {currentUser.isAdmin && (
-          <Link to={"/create-post"}>
+          <Link to="/create-post">
             <Button
               type="button"
               gradientDuoTone="purpleToPink"
@@ -255,14 +285,22 @@ export default function DashProfile() {
           </Link>
         )}
       </form>
+      
       <div className="text-red-500 flex justify-between mt-5">
-        <span onClick={() => setShowModal(true)} className="cursor-pointer">
+        <span 
+          onClick={() => setShowModal(true)} 
+          className="cursor-pointer hover:underline"
+        >
           Delete Account
         </span>
-        <span onClick={handleSignout} className="cursor-pointer">
+        <span 
+          onClick={handleSignout} 
+          className="cursor-pointer hover:underline"
+        >
           Sign Out
         </span>
       </div>
+      
       <Modal
         show={showModal}
         onClose={() => setShowModal(false)}

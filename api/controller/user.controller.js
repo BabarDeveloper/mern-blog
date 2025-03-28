@@ -12,12 +12,15 @@ export const updateUser = async (req, res, next) => {
     return next(errorHandler(403, "You are not allowed to update this user"));
   }
 
+  // Create update object with only provided fields
+  const updateFields = {};
+
   // Validate and hash the password if provided
   if (req.body.password) {
     if (req.body.password.length < 6) {
       return next(errorHandler(400, "Password must be at least 6 characters"));
     }
-    req.body.password = bcryptjs.hashSync(req.body.password, 10);
+    updateFields.password = bcryptjs.hashSync(req.body.password, 10);
   }
 
   // Validate the username if provided
@@ -38,27 +41,57 @@ export const updateUser = async (req, res, next) => {
         errorHandler(400, "Username can only contain letters and numbers")
       );
     }
+    updateFields.username = req.body.username;
+  }
+
+  // Validate email if provided
+  if (req.body.email) {
+    if (!req.body.email.includes('@') || !req.body.email.includes('.')) {
+      return next(errorHandler(400, "Please provide a valid email address"));
+    }
+    updateFields.email = req.body.email;
+  }
+
+  // Validate profile picture URL if provided
+  if (req.body.profilePicture) {
+    try {
+      // Basic URL validation
+      new URL(req.body.profilePicture);
+      
+      // Optional: Verify it's a Cloudinary URL if needed
+      if (!req.body.profilePicture.includes('res.cloudinary.com')) {
+        return next(errorHandler(400, "Please provide a valid image URL"));
+      }
+      
+      updateFields.profilePicture = req.body.profilePicture;
+    } catch (error) {
+      return next(errorHandler(400, "Invalid profile picture URL"));
+    }
   }
 
   try {
-    // Update the user
+    // Update only the fields that were provided
     const updatedUser = await User.findByIdAndUpdate(
       req.params.userId,
-      {
-        $set: {
-          username: req.body.username,
-          email: req.body.email,
-          profilePicture: req.body.profilePicture,
-          password: req.body.password,
-        },
-      },
+      { $set: updateFields },
       { new: true }
     );
+
+    if (!updatedUser) {
+      return next(errorHandler(404, "User not found"));
+    }
 
     // Remove the password from the response
     const { password, ...rest } = updatedUser._doc;
     res.status(200).json(rest);
   } catch (error) {
+    // Handle duplicate key errors (username or email)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return next(
+        errorHandler(400, `${field} is already in use by another account`)
+      );
+    }
     next(error);
   }
 };
