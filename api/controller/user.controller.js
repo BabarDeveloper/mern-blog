@@ -46,7 +46,7 @@ export const updateUser = async (req, res, next) => {
 
   // Validate email if provided
   if (req.body.email) {
-    if (!req.body.email.includes('@') || !req.body.email.includes('.')) {
+    if (!req.body.email.includes("@") || !req.body.email.includes(".")) {
       return next(errorHandler(400, "Please provide a valid email address"));
     }
     updateFields.email = req.body.email;
@@ -57,12 +57,12 @@ export const updateUser = async (req, res, next) => {
     try {
       // Basic URL validation
       new URL(req.body.profilePicture);
-      
+
       // Optional: Verify it's a Cloudinary URL if needed
-      if (!req.body.profilePicture.includes('res.cloudinary.com')) {
+      if (!req.body.profilePicture.includes("res.cloudinary.com")) {
         return next(errorHandler(400, "Please provide a valid image URL"));
       }
-      
+
       updateFields.profilePicture = req.body.profilePicture;
     } catch (error) {
       return next(errorHandler(400, "Invalid profile picture URL"));
@@ -157,6 +157,19 @@ export const getUsers = async (req, res, next) => {
       totalUsers,
       lastMonthUsers,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.userId);
+    if (!user) {
+      return next(errorHandler(404, "User not found"));
+    }
+    const { password, ...rest } = user._doc;
+    res.status(200).json(rest);
   } catch (error) {
     next(error);
   }
