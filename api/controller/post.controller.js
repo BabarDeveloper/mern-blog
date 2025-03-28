@@ -87,21 +87,43 @@ export const updatepost = async (req, res, next) => {
   if (!req.user.isAdmin || req.user.id !== req.params.userId) {
     return next(errorHandler(403, "You are not allowed to update this post"));
   }
+  
   try {
+    // Generate new slug if title changed
+    let slug = req.body.title
+      .toLowerCase()
+      .replace(/ /g, '-')
+      .replace(/[^\w-]+/g, '');
+    
+    const updateData = {
+      title: req.body.title,
+      content: req.body.content,
+      category: req.body.category,
+      image: req.body.image, // Using correct field name
+      slug // Always update slug to ensure consistency
+    };
+
+    // Validate required fields
+    if (!updateData.title || !updateData.content) {
+      return next(errorHandler(400, "Title and content are required"));
+    }
+
     const updatedPost = await Post.findByIdAndUpdate(
       req.params.postId,
-      {
-        $set: {
-          title: req.body.title,
-          content: req.body.content,
-          category: req.body.category,
-          image: req.body.image,
-        },
-      },
+      { $set: updateData },
       { new: true }
     );
+
+    if (!updatedPost) {
+      return next(errorHandler(404, "Post not found"));
+    }
+
     res.status(200).json(updatedPost);
   } catch (error) {
+    // Handle duplicate key errors (title/slug)
+    if (error.code === 11000) {
+      return next(errorHandler(400, "A post with this title already exists"));
+    }
     next(error);
   }
 };
