@@ -95,3 +95,58 @@ export const deleteComment = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getcomments = async (req, res, next) => {
+  try {
+    // 1. Authentication & Authorization Check
+    if (!req.user.isAdmin) {
+      return next(errorHandler(403, "Only admin can access all comments"));
+    }
+
+    // 2. Input Validation & Sanitization
+    const startIndex = Math.max(0, parseInt(req.query.startIndex)) || 0;
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit))) || 9;
+    const sortDirection = req.query.sort === "desc" ? -1 : 1;
+
+    // 3. Calculate date range for last month's comments
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    // 4. Parallel Database Queries
+    const [comments, totalComments, lastMonthComments] = await Promise.all([
+      Comment.find()
+        .sort({ createdAt: sortDirection })
+        .skip(startIndex)
+        .limit(limit)
+        .lean(),  // Convert to plain JS objects
+      Comment.countDocuments(),
+      Comment.countDocuments({
+        createdAt: { $gte: oneMonthAgo }
+      })
+    ]);
+
+    // 5. Response Formatting
+    res.status(200).json({
+      success: true,
+      comments,
+      pagination: {
+        total: totalComments,
+        returned: comments.length,
+        limit,
+        startIndex,
+        nextStart: startIndex + limit < totalComments ? startIndex + limit : null
+      },
+      analytics: {
+        lastMonth: lastMonthComments,
+        percentageChange: totalComments > 0 
+          ? ((lastMonthComments / totalComments) * 100).toFixed(2)
+          : 0
+      }
+    });
+
+  } catch (error) {
+    // 6. Error Handling
+    console.error(`[${new Date().toISOString()}] Comment fetch error:`, error);
+    next(errorHandler(500, "Internal server error while fetching comments"));
+  }
+};
