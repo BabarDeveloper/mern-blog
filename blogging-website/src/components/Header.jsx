@@ -15,10 +15,11 @@ export default function Header() {
   const { currentUser } = useSelector((state) => state.user);
   const { theme } = useSelector((state) => state.theme);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
-    const searchTermFromUrl = urlParams.get("search");
+    const searchTermFromUrl = urlParams.get("searchTerm");
     if (searchTermFromUrl) {
       setSearchTerm(searchTermFromUrl);
     }
@@ -45,7 +46,8 @@ export default function Header() {
     const urlParams = new URLSearchParams(location.search);
     urlParams.set("searchTerm", searchTerm);
     const searchQuery = urlParams.toString();
-    navigate(`/search?${searchQuery}`)
+    navigate(`/search?${searchQuery}`);
+    setShowMobileSearch(false); // Close mobile search after submission
   };
 
   return (
@@ -59,19 +61,45 @@ export default function Header() {
         </span>
         Blog
       </Link>
-      <form onSubmit={handleSubmit}>
+
+      {/* Desktop Search */}
+      <form onSubmit={handleSubmit} className="hidden lg:block">
         <TextInput
           type="text"
           placeholder="Search...."
           rightIcon={AiOutlineSearch}
-          className="hidden lg:inline"
+          className="w-full"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </form>
-      <Button className="w-12 h-10 lg:hidden" color="gray" pill>
-        <AiOutlineSearch />
-      </Button>
+
+      {/* Mobile Search */}
+      <div className="flex items-center lg:hidden">
+        {showMobileSearch ? (
+          <form onSubmit={handleSubmit} className="absolute top-16 left-0 right-0 p-4 bg-white dark:bg-gray-800 z-50">
+            <TextInput
+              type="text"
+              placeholder="Search...."
+              rightIcon={AiOutlineSearch}
+              className="w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              autoFocus
+            />
+          </form>
+        ) : (
+          <Button 
+            className="w-12 h-10" 
+            color="gray" 
+            pill
+            onClick={() => setShowMobileSearch(true)}
+          >
+            <AiOutlineSearch />
+          </Button>
+        )}
+      </div>
+
       <div className="flex gap-2 md:order-2">
         <Button
           className="w-12 h-10 hidden sm:inline"
